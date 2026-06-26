@@ -50,7 +50,7 @@ function LuannyUi:Notify(options)
     local titleText = options.Title or "Notification"
     local descText = options.Desc or ""
     local duration = options.Duration or 5
-    local noticeColor = options.Color or Color3.fromRGB(160, 90, 255) -- 紫色
+    local noticeColor = options.Color or Color3.fromRGB(160, 90, 255)
     local iconName = options.Icon
     local buttons = options.Buttons or {}
     local hasButtons = #buttons > 0
@@ -64,12 +64,12 @@ function LuannyUi:Notify(options)
     local card = Instance.new("CanvasGroup", wrapper)
     card.Size = UDim2.new(1, 0, 1, 0)
     card.Position = UDim2.new(0, 50, 0, 0)
-    card.BackgroundColor3 = Color3.fromRGB(18, 18, 22) -- 深紫黑
+    card.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     card.GroupTransparency = 1
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
     
     local stroke = Instance.new("UIStroke", card)
-    stroke.Color = Color3.fromRGB(80, 40, 120) -- 紫色边框
+    stroke.Color = Color3.fromRGB(80, 40, 120)
     stroke.Thickness = 1
 
     local textRightOffset = 12
@@ -89,7 +89,7 @@ function LuannyUi:Notify(options)
     lblTitle.Position = UDim2.new(0, 12, 0, 12)
     lblTitle.BackgroundTransparency = 1
     lblTitle.Text = titleText
-    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 255) -- 浅紫色文字
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 255)
     lblTitle.FontFace = FontTitle
     lblTitle.TextSize = 13
     lblTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -99,7 +99,7 @@ function LuannyUi:Notify(options)
     lblDesc.Position = UDim2.new(0, 12, 0, 30)
     lblDesc.BackgroundTransparency = 1
     lblDesc.Text = descText
-    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190) -- 灰紫色
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
     lblDesc.FontFace = FontUI
     lblDesc.TextSize = 12
     lblDesc.TextWrapped = true
@@ -109,7 +109,7 @@ function LuannyUi:Notify(options)
     local progressBg = Instance.new("Frame", card)
     progressBg.Size = UDim2.new(1, 0, 0, 2)
     progressBg.Position = UDim2.new(0, 0, 1, -2)
-    progressBg.BackgroundColor3 = Color3.fromRGB(40, 30, 50) -- 深紫背景
+    progressBg.BackgroundColor3 = Color3.fromRGB(40, 30, 50)
     progressBg.BorderSizePixel = 0
 
     local progressBar = Instance.new("Frame", progressBg)
@@ -147,7 +147,7 @@ function LuannyUi:Notify(options)
         for _, btnData in ipairs(buttons) do
             local btn = Instance.new("TextButton", btnContainer)
             btn.Size = UDim2.new(1 / #buttons, -((6 * (#buttons - 1)) / #buttons), 1, 0)
-            btn.BackgroundColor3 = Color3.fromRGB(45, 35, 55) -- 深紫按钮
+            btn.BackgroundColor3 = Color3.fromRGB(45, 35, 55)
             btn.Text = btnData.Title or "Button"
             btn.TextColor3 = Color3.fromRGB(220, 200, 255)
             btn.FontFace = FontUI
@@ -300,7 +300,6 @@ function LuannyUi:CreateWindow(config)
 
     if CoreGui:FindFirstChild("LuannyUI") then CoreGui.LuannyUI:Destroy() end
 
-    -- 紫黑配色
     local bgColor = WindowConfig.Theme == "Light" and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(12, 10, 16)
     local strokeColor = WindowConfig.Theme == "Light" and Color3.fromRGB(100, 60, 140) or Color3.fromRGB(60, 35, 90)
     local bgAlpha = WindowConfig.Transparent and 0.25 or 0
@@ -377,7 +376,7 @@ function LuannyUi:CreateWindow(config)
     LblTitle.Size = UDim2.new(1, 0, 0, 16)
     LblTitle.BackgroundTransparency = 1
     LblTitle.Text = WindowConfig.Title
-    LblTitle.TextColor3 = Color3.fromRGB(200, 180, 230) -- 浅紫
+    LblTitle.TextColor3 = Color3.fromRGB(200, 180, 230)
     LblTitle.FontFace = FontUI
     LblTitle.TextSize = 15
     LblTitle.TextXAlignment = Enum.TextXAlignment.Right
@@ -388,7 +387,7 @@ function LuannyUi:CreateWindow(config)
     LblAuthor.Size = UDim2.new(1, 0, 0, 12)
     LblAuthor.BackgroundTransparency = 1
     LblAuthor.Text = WindowConfig.Author
-    LblAuthor.TextColor3 = Color3.fromRGB(160, 140, 190) -- 灰紫
+    LblAuthor.TextColor3 = Color3.fromRGB(160, 140, 190)
     LblAuthor.FontFace = FontUI
     LblAuthor.TextSize = 11
     LblAuthor.TextXAlignment = Enum.TextXAlignment.Right
@@ -445,7 +444,7 @@ function LuannyUi:Tab(options)
     local titleName = options.Title or "Tab"
     local iconName = options.Icon or "layout-grid"
     local windowHeight = options.Height or 350 
-    local tabColor = options.Color or Color3.fromRGB(160, 90, 255) -- 紫色
+    local tabColor = options.Color or Color3.fromRGB(160, 90, 255)
     
     local winBgColor = WindowConfig.Theme == "Light" and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(14, 12, 18)
     local winStrokeColor = WindowConfig.Theme == "Light" and Color3.fromRGB(100, 60, 140) or Color3.fromRGB(60, 35, 90)
@@ -505,6 +504,15 @@ function LuannyUi:Tab(options)
 
     btn.MouseButton1Click:Connect(function() ToggleWindow(maskFrame, windowHeight) end)
 
+    -- ===== 自动打开第一个Tab =====
+    if not CurrentWindow then
+        task.spawn(function()
+            task.wait(0.1)
+            ToggleWindow(maskFrame, windowHeight)
+        end)
+    end
+    -- =============================
+
     local TabData = {Container = container, ItemCount = 0}
     setmetatable(TabData, TabClass)
     return TabData
@@ -524,7 +532,7 @@ function TabClass:Section(options)
     lbl.Position = UDim2.new(0, 5, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = titleText
-    lbl.TextColor3 = Color3.fromRGB(180, 160, 210) -- 紫色标题
+    lbl.TextColor3 = Color3.fromRGB(180, 160, 210)
     lbl.FontFace = FontUI
     lbl.TextSize = 14
     lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -952,5 +960,39 @@ function TabClass:Slider(options)
         Get = function() return currentVal end
     }
 end
+
+
+function LuannyUi:Destroy()
+    if ScreenGui then
+        ScreenGui:Destroy()
+        ScreenGui = nil
+    end
+    
+    if NotifyScreen then
+        NotifyScreen:Destroy()
+        NotifyScreen = nil
+    end
+    
+    Initialized = false
+    CurrentWindow = nil
+    IsBarVisible = true
+    IsExpanded = false
+    LayoutOrderCount = 0
+    WindowConfig = {}
+    AllTextElements = {}
+end
+
+function LuannyUi:Hide()
+    if ScreenGui then
+        ScreenGui.Enabled = false
+    end
+end
+
+function LuannyUi:Show()
+    if ScreenGui then
+        ScreenGui.Enabled = true
+    end
+end
+
 
 return LuannyUi
