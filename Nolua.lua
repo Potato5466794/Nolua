@@ -25,97 +25,92 @@ local successIcons, Lucide = pcall(function()
 end)
 local Icons = (successIcons and type(Lucide) == "table") and Lucide or setmetatable({}, {__index = function() return "" end})
 
--- ===== 高级动画系统 =====
-local AnimationSystem = {}
-AnimationSystem.__index = AnimationSystem
-
-function AnimationSystem:FadeIn(element, duration, delay)
-    duration = duration or 0.4
-    delay = delay or 0
-    element.BackgroundTransparency = 1
-    element.GroupTransparency = 1
-    element.Size = UDim2.new(element.Size.X.Scale, element.Size.X.Offset * 0.9, element.Size.Y.Scale, element.Size.Y.Offset * 0.9)
-    
-    task.delay(delay, function()
-        local tween1 = TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Size = UDim2.new(element.Size.X.Scale, element.Size.X.Offset, element.Size.Y.Scale, element.Size.Y.Offset)
-        })
-        local tween2 = TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            GroupTransparency = 0,
-            BackgroundTransparency = 0
-        })
-        tween1:Play()
-        tween2:Play()
-    end)
-end
-
-function AnimationSystem:FadeOut(element, duration, callback)
-    duration = duration or 0.3
-    local tween1 = TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        GroupTransparency = 1,
-        BackgroundTransparency = 1
-    })
-    local tween2 = TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-        Size = UDim2.new(element.Size.X.Scale, element.Size.X.Offset * 0.9, element.Size.Y.Scale, element.Size.Y.Offset * 0.9)
-    })
-    tween1:Play()
-    tween2:Play()
-    tween1.Completed:Connect(function()
-        if callback then callback() end
-    end)
-end
-
-function AnimationSystem:SlideIn(element, direction, duration, delay)
-    duration = duration or 0.5
-    delay = delay or 0
-    local startPos = element.Position
-    
-    if direction == "left" then
-        element.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset - 100, startPos.Y.Scale, startPos.Y.Offset)
-    elseif direction == "right" then
-        element.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + 100, startPos.Y.Scale, startPos.Y.Offset)
-    elseif direction == "up" then
-        element.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset, startPos.Y.Scale, startPos.Y.Offset - 50)
-    elseif direction == "down" then
-        element.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset, startPos.Y.Scale, startPos.Y.Offset + 50)
+-- 高级缓动函数
+local Easing = {
+    -- 弹簧效果
+    Spring = function(t, stiffness, damping)
+        stiffness = stiffness or 8
+        damping = damping or 0.85
+        local b = 1 - t
+        return 1 - (math.exp(-stiffness * t) * (math.cos(stiffness * t * 0.5) + (damping * math.sin(stiffness * t * 0.5))))
+    end,
+    -- 弹性缓出
+    ElasticOut = function(t)
+        if t == 0 or t == 1 then return t end
+        return math.pow(2, -10 * t) * math.sin((t - 0.1) * 5 * math.pi) + 1
+    end,
+    -- 平滑缓出 (自定义)
+    SmoothOut = function(t)
+        return 1 - math.pow(1 - t, 2.5)
+    end,
+    -- 平滑缓入缓出
+    SmoothInOut = function(t)
+        return t < 0.5 and 2 * t * t or 1 - math.pow(-2 * t + 2, 2) / 2
+    end,
+    -- 优雅缓出
+    ElegantOut = function(t)
+        return 1 - math.pow(1 - t, 3.5)
+    end,
+    -- 弹跳效果
+    BounceOut = function(t)
+        local n1 = 7.5625
+        local d1 = 2.75
+        if t < 1 / d1 then
+            return n1 * t * t
+        elseif t < 2 / d1 then
+            return n1 * (t -= 1.5 / d1) * t + 0.75
+        elseif t < 2.5 / d1 then
+            return n1 * (t -= 2.25 / d1) * t + 0.9375
+        else
+            return n1 * (t -= 2.625 / d1) * t + 0.984375
+        end
     end
-    
-    task.delay(delay, function()
-        TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Position = startPos
-        }):Play()
-    end)
-end
+}
 
-function AnimationSystem:ScaleIn(element, duration, delay)
-    duration = duration or 0.4
-    delay = delay or 0
-    element.Size = UDim2.new(element.Size.X.Scale, element.Size.X.Offset * 0.5, element.Size.Y.Scale, element.Size.Y.Offset * 0.5)
+-- 高级动画工具
+local AnimationTools = {
+    -- 创建流畅的动画序列
+    Sequence = function(animations)
+        return function(step)
+            local total = 0
+            for _, anim in ipairs(animations) do
+                total = total + anim.duration
+            end
+            local current = 0
+            for _, anim in ipairs(animations) do
+                local progress = math.clamp((step - current) / anim.duration, 0, 1)
+                if progress < 1 then
+                    return anim.value(anim.easing(progress))
+                end
+                current = current + anim.duration
+            end
+            return animations[#animations].value(1)
+        end
+    end,
     
-    task.delay(delay, function()
-        TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.new(element.Size.X.Scale, element.Size.X.Offset, element.Size.Y.Scale, element.Size.Y.Offset)
-        }):Play()
-    end)
-end
+    -- 创建平滑的缓动函数
+    CreateEase = function(easeType, duration)
+        return function(t)
+            local progress = math.clamp(t / duration, 0, 1)
+            if easeType == "Spring" then
+                return Easing.Spring(progress)
+            elseif easeType == "ElasticOut" then
+                return Easing.ElasticOut(progress)
+            elseif easeType == "SmoothOut" then
+                return Easing.SmoothOut(progress)
+            elseif easeType == "SmoothInOut" then
+                return Easing.SmoothInOut(progress)
+            elseif easeType == "ElegantOut" then
+                return Easing.ElegantOut(progress)
+            elseif easeType == "BounceOut" then
+                return Easing.BounceOut(progress)
+            else
+                return progress
+            end
+        end
+    end
+}
 
-function AnimationSystem:Pulse(element, scale, duration)
-    scale = scale or 1.05
-    duration = duration or 0.3
-    local originalSize = element.Size
-    
-    local tween = TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * scale, originalSize.Y.Scale, originalSize.Y.Offset * scale)
-    })
-    tween:Play()
-    tween.Completed:Connect(function()
-        TweenService:Create(element, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = originalSize
-        }):Play()
-    end)
-end
-
--- 优化通知系统
 if CoreGui:FindFirstChild("LuannyNotifyScreen") then
     CoreGui.LuannyNotifyScreen:Destroy()
 end
@@ -163,13 +158,6 @@ function LuannyUi:Notify(options)
     local stroke = Instance.new("UIStroke", card)
     stroke.Color = Color3.fromRGB(80, 40, 120)
     stroke.Thickness = 1
-
-    local glow = Instance.new("Frame", card)
-    glow.Size = UDim2.new(1, 0, 1, 0)
-    glow.BackgroundColor3 = noticeColor
-    glow.BackgroundTransparency = 0.8
-    glow.ZIndex = 0
-    Instance.new("UICorner", glow).CornerRadius = UDim.new(0, 8)
 
     local textRightOffset = 12
     if iconName and Icons[iconName] then
@@ -220,9 +208,10 @@ function LuannyUi:Notify(options)
     local function closeNotification()
         if isClosed then return end
         isClosed = true
-        local closeTween = TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+        -- 优化的关闭动画：优雅的淡出和位移
+        local closeTween = TweenService:Create(card, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
             GroupTransparency = 1,
-            Position = UDim2.new(0, 50, 0, 0)
+            Position = UDim2.new(0, 30, 0, 0)
         })
         closeTween:Play()
         closeTween.Completed:Connect(function()
@@ -257,11 +246,18 @@ function LuannyUi:Notify(options)
             local btnStroke = Instance.new("UIStroke", btn)
             btnStroke.Color = Color3.fromRGB(80, 50, 110)
             
+            -- 优化的悬停动画
             btn.MouseEnter:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(60, 45, 75)}):Play()
+                TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = Color3.fromRGB(60, 45, 75),
+                    Size = UDim2.new(1 / #buttons, -((6 * (#buttons - 1)) / #buttons) + 2, 1, 2)
+                }):Play()
             end)
             btn.MouseLeave:Connect(function()
-                TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(45, 35, 55)}):Play()
+                TweenService:Create(btn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                    BackgroundColor3 = Color3.fromRGB(45, 35, 55),
+                    Size = UDim2.new(1 / #buttons, -((6 * (#buttons - 1)) / #buttons), 1, 0)
+                }):Play()
             end)
 
             btn.MouseButton1Click:Connect(function()
@@ -271,14 +267,18 @@ function LuannyUi:Notify(options)
         end
     end
 
-    -- 高级入场动画
-    AnimationSystem:FadeIn(card, 0.5)
-    AnimationSystem:SlideIn(card, "left", 0.5)
-    AnimationSystem:ScaleIn(card, 0.3, 0.1)
+    -- 优化的进入动画：弹簧效果
+    local enterTween = TweenService:Create(card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        GroupTransparency = 0,
+        Position = UDim2.new(0, 0, 0, 0)
+    })
+    enterTween:Play()
 
-    TweenService:Create(progressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
+    -- 优化的进度条动画
+    local progressTween = TweenService:Create(progressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {
         Size = UDim2.new(0, 0, 1, 0)
-    }):Play()
+    })
+    progressTween:Play()
 
     task.delay(duration, function()
         closeNotification()
@@ -335,11 +335,12 @@ local function UpdateToolbarWidth()
 
     if IsExpanded then InfoContainer.Visible = true end
 
-    TweenService:Create(Toolbar, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    -- 优化的工具栏宽度动画：弹簧效果
+    TweenService:Create(Toolbar, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 1.2), {
         Size = UDim2.new(0, totalWidth, 0, 45)
     }):Play()
 
-    local tw = TweenService:Create(InfoContainer, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+    local tw = TweenService:Create(InfoContainer, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Size = UDim2.new(0, infoWidth, 1, 0)
     })
     tw:Play()
@@ -352,11 +353,17 @@ local function ToggleWindow(target, windowHeight)
     local innerFrame = target:FindFirstChildOfClass("CanvasGroup")
     
     if CurrentWindow == target then
-        TweenService:Create(Overlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = 1}):Play()
+        -- 优化的关闭动画
+        TweenService:Create(Overlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
+            BackgroundTransparency = 1
+        }):Play()
         if innerFrame then
-            AnimationSystem:FadeOut(innerFrame, 0.3, function()
-                target.Visible = false
-            end)
+            local closeTween = TweenService:Create(innerFrame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                GroupTransparency = 1,
+                Size = UDim2.new(0, 380, 0, windowHeight - 15)
+            })
+            closeTween:Play()
+            closeTween.Completed:Connect(function() target.Visible = false end)
         else
             target.Visible = false
         end
@@ -364,20 +371,25 @@ local function ToggleWindow(target, windowHeight)
     else
         if CurrentWindow then 
             local oldWindow = CurrentWindow:FindFirstChildOfClass("CanvasGroup")
-            if oldWindow then 
-                AnimationSystem:FadeOut(oldWindow, 0.2)
-            end
+            if oldWindow then oldWindow.GroupTransparency = 1 end
             CurrentWindow.Visible = false
         end
         target.Size = UDim2.new(0, 380, 0, windowHeight)
         target.Visible = true
         CurrentWindow = target
-        TweenService:Create(Overlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {BackgroundTransparency = WindowConfig.Transparent and 0.4 or 0.6}):Play()
+        -- 优化的遮罩动画
+        TweenService:Create(Overlay, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundTransparency = WindowConfig.Transparent and 0.3 or 0.5
+        }):Play()
         if innerFrame then
             innerFrame.Size = UDim2.new(0, 380, 0, windowHeight - 15)
             innerFrame.GroupTransparency = 1
-            AnimationSystem:FadeIn(innerFrame, 0.4, 0.1)
-            AnimationSystem:ScaleIn(innerFrame, 0.3, 0.1)
+            -- 优化的窗口打开动画：弹性缓出
+            local openTween = TweenService:Create(innerFrame, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 1.1), {
+                GroupTransparency = 0,
+                Size = UDim2.new(0, 380, 0, windowHeight)
+            })
+            openTween:Play()
         end
     end
 end
@@ -498,10 +510,21 @@ function LuannyUi:CreateWindow(config)
     ExpandBtn.Image = Icons["chevron-right"] or ""
     ExpandBtn.ImageColor3 = Color3.fromRGB(200, 180, 230)
     ExpandBtn.ZIndex = 6
+    
+    -- 优化的展开按钮动画
+    local expandAnimating = false
     ExpandBtn.MouseButton1Click:Connect(function()
+        if expandAnimating then return end
+        expandAnimating = true
         IsExpanded = not IsExpanded
         ExpandBtn.Image = IsExpanded and Icons["chevron-left"] or Icons["chevron-right"]
+        -- 按钮旋转动画
+        TweenService:Create(ExpandBtn, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Rotation = IsExpanded and 180 or 0
+        }):Play()
         UpdateToolbarWidth()
+        task.wait(0.5)
+        expandAnimating = false
     end)
 
     local BtnToggleBar = Instance.new("ImageButton", Toolbar)
@@ -515,16 +538,28 @@ function LuannyUi:CreateWindow(config)
 
     IsBarVisible = WindowConfig.ShowWindow
     BtnToggleBar.Image = IsBarVisible and Icons["chevron-down"] or Icons["chevron-up"]
+    
+    -- 优化的工具栏切换动画
+    local toggleAnimating = false
     BtnToggleBar.MouseButton1Click:Connect(function()
+        if toggleAnimating then return end
+        toggleAnimating = true
         IsBarVisible = not IsBarVisible
         BtnToggleBar.Image = IsBarVisible and Icons["chevron-down"] or Icons["chevron-up"]
-        TweenService:Create(Toolbar, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        -- 按钮旋转动画
+        TweenService:Create(BtnToggleBar, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Rotation = IsBarVisible and 0 or 180
+        }):Play()
+        -- 工具栏滑动动画
+        TweenService:Create(Toolbar, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Position = IsBarVisible and UDim2.new(0.5, 0, 1, -20) or UDim2.new(0.5, 0, 1, 60)
         }):Play()
         if not IsBarVisible and CurrentWindow then 
             local h = CurrentWindow:GetAttribute("Height") or 350
             ToggleWindow(CurrentWindow, h) 
         end
+        task.wait(0.5)
+        toggleAnimating = false
     end)
 
     return self
@@ -546,7 +581,11 @@ function LuannyUi:Tab(options)
     local winStrokeColor = WindowConfig.Theme == "Light" and Color3.fromRGB(100, 60, 140) or Color3.fromRGB(60, 35, 90)
 
     local btn = Instance.new("TextButton", DockContainer)
-    btn.Size = UDim2.new(0, 32, 0, 32); btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255); btn.Text = ""; btn.LayoutOrder = LayoutOrderCount; btn.ZIndex = 8
+    btn.Size = UDim2.new(0, 32, 0, 32)
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = ""
+    btn.LayoutOrder = LayoutOrderCount
+    btn.ZIndex = 8
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     
     local grad = Instance.new("UIGradient", btn)
@@ -561,7 +600,25 @@ function LuannyUi:Tab(options)
     end
     
     local ic = Instance.new("ImageLabel", btn)
-    ic.Size = UDim2.new(0, 18, 0, 18); ic.AnchorPoint = Vector2.new(0.5, 0.5); ic.Position = UDim2.new(0.5, 0, 0.5, 0); ic.BackgroundTransparency = 1; ic.Image = Icons[iconName] or ""; ic.ImageColor3 = Color3.fromRGB(255,255,255); ic.ZIndex = 9
+    ic.Size = UDim2.new(0, 18, 0, 18)
+    ic.AnchorPoint = Vector2.new(0.5, 0.5)
+    ic.Position = UDim2.new(0.5, 0, 0.5, 0)
+    ic.BackgroundTransparency = 1
+    ic.Image = Icons[iconName] or ""
+    ic.ImageColor3 = Color3.fromRGB(255,255,255)
+    ic.ZIndex = 9
+
+    -- 优化的按钮悬停动画
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 36, 0, 36)
+        }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 32, 0, 32)
+        }):Play()
+    end)
 
     local maskFrame = Instance.new("Frame", ScreenGui)
     maskFrame.AnchorPoint = Vector2.new(0.5, 1)
@@ -585,13 +642,25 @@ function LuannyUi:Tab(options)
     Instance.new("UIStroke", frame).Color = winStrokeColor
     
     local tl = Instance.new("TextLabel", frame)
-    tl.Size = UDim2.new(1, 0, 0, 45); tl.BackgroundTransparency = 1; tl.Text = titleName; tl.TextColor3 = Color3.fromRGB(200, 180, 230); tl.FontFace = FontUI; tl.TextSize = 22; tl.ZIndex = 11
+    tl.Size = UDim2.new(1, 0, 0, 45)
+    tl.BackgroundTransparency = 1
+    tl.Text = titleName
+    tl.TextColor3 = Color3.fromRGB(200, 180, 230)
+    tl.FontFace = FontUI
+    tl.TextSize = 22
+    tl.ZIndex = 11
     RegisterText(tl)
 
     local container = Instance.new("ScrollingFrame", frame)
-    container.Size = UDim2.new(1, 0, 1, -50); container.Position = UDim2.new(0, 0, 0, 45); container.BackgroundTransparency = 1; container.ScrollBarThickness = 0; container.ZIndex = 11
+    container.Size = UDim2.new(1, 0, 1, -50)
+    container.Position = UDim2.new(0, 0, 0, 45)
+    container.BackgroundTransparency = 1
+    container.ScrollBarThickness = 0
+    container.ZIndex = 11
     local layout = Instance.new("UIListLayout", container)
-    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center; layout.SortOrder = Enum.SortOrder.LayoutOrder; layout.Padding = UDim.new(0, 8)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 8)
     Instance.new("UIPadding", container).PaddingTop = UDim.new(0, 5)
 
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -600,13 +669,14 @@ function LuannyUi:Tab(options)
 
     btn.MouseButton1Click:Connect(function() ToggleWindow(maskFrame, windowHeight) end)
 
-    -- 自动打开第一个Tab
+    -- ===== 自动打开第一个Tab =====
     if not CurrentWindow then
         task.spawn(function()
-            task.wait(0.15)
+            task.wait(0.1)
             ToggleWindow(maskFrame, windowHeight)
         end)
     end
+    -- =============================
 
     local TabData = {Container = container, ItemCount = 0}
     setmetatable(TabData, TabClass)
@@ -640,11 +710,20 @@ function TabClass:Section(options)
     line.BackgroundTransparency = 0.6
 
     return {
-        SetTitle = function(t) lbl.Text = t end,
+        SetTitle = function(t) 
+            lbl.Text = t 
+            -- 文字变化动画
+            TweenService:Create(lbl, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                TextTransparency = 0
+            }):Play()
+        end,
         Destroy = function() 
-            AnimationSystem:FadeOut(sectionFrame, 0.3, function()
-                sectionFrame:Destroy()
-            end)
+            -- 优雅的销毁动画
+            TweenService:Create(sectionFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0)
+            }):Play()
+            task.wait(0.3)
+            sectionFrame:Destroy() 
         end
     }
 end
@@ -654,61 +733,130 @@ function TabClass:Button(options)
     local isLight = WindowConfig.Theme == "Light"
 
     local card = Instance.new("TextButton", self.Container)
-    card.Size = UDim2.new(0, 340, 0, 55); card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24); card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0; card.Text = ""; card.AutoButtonColor = false; card.LayoutOrder = self.ItemCount; card.ZIndex = 12
+    card.Size = UDim2.new(0, 340, 0, 55)
+    card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+    card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0
+    card.Text = ""
+    card.AutoButtonColor = false
+    card.LayoutOrder = self.ItemCount
+    card.ZIndex = 12
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
     local stroke = Instance.new("UIStroke", card)
     stroke.Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
+    stroke.Thickness = 1
 
     local lockOverlay = CreateLockOverlay(card)
 
     local lblTitle = Instance.new("TextLabel", card)
-    lblTitle.Size = UDim2.new(1, -20, 0, 18); lblTitle.Position = UDim2.new(0, 10, 0, 8); lblTitle.BackgroundTransparency = 1; lblTitle.Text = options.Title or "Button"; lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245); lblTitle.FontFace = FontUI; lblTitle.TextSize = 14; lblTitle.TextXAlignment = Enum.TextXAlignment.Left; lblTitle.ZIndex = 13
+    lblTitle.Size = UDim2.new(1, -20, 0, 18)
+    lblTitle.Position = UDim2.new(0, 10, 0, 8)
+    lblTitle.BackgroundTransparency = 1
+    lblTitle.Text = options.Title or "Button"
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245)
+    lblTitle.FontFace = FontUI
+    lblTitle.TextSize = 14
+    lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+    lblTitle.ZIndex = 13
     RegisterText(lblTitle)
 
     local lblDesc = Instance.new("TextLabel", card)
-    lblDesc.Size = UDim2.new(1, -20, 0, 16); lblDesc.Position = UDim2.new(0, 10, 0, 28); lblDesc.BackgroundTransparency = 1; lblDesc.Text = options.Desc or ""; lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190); lblDesc.FontFace = FontUI; lblDesc.TextSize = 11; lblDesc.TextXAlignment = Enum.TextXAlignment.Left; lblDesc.ZIndex = 13
+    lblDesc.Size = UDim2.new(1, -20, 0, 16)
+    lblDesc.Position = UDim2.new(0, 10, 0, 28)
+    lblDesc.BackgroundTransparency = 1
+    lblDesc.Text = options.Desc or ""
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
+    lblDesc.FontFace = FontUI
+    lblDesc.TextSize = 11
+    lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+    lblDesc.ZIndex = 13
     RegisterText(lblDesc)
 
     local ic = Instance.new("ImageLabel", card)
-    ic.Size = UDim2.new(0, 16, 0, 16); ic.AnchorPoint = Vector2.new(1, 0.5); ic.Position = UDim2.new(1, -10, 0.5, 0); ic.BackgroundTransparency = 1; ic.Image = Icons[options.Icon or "mouse-pointer-click"] or ""; ic.ImageColor3 = Color3.fromRGB(200, 180, 230); ic.ZIndex = 13
+    ic.Size = UDim2.new(0, 16, 0, 16)
+    ic.AnchorPoint = Vector2.new(1, 0.5)
+    ic.Position = UDim2.new(1, -10, 0.5, 0)
+    ic.BackgroundTransparency = 1
+    ic.Image = Icons[options.Icon or "mouse-pointer-click"] or ""
+    ic.ImageColor3 = Color3.fromRGB(200, 180, 230)
+    ic.ZIndex = 13
 
-    card.MouseEnter:Connect(function() 
-        if not lockOverlay.Visible then 
-            TweenService:Create(stroke, TweenInfo.new(0.2), {Color = isLight and Color3.fromRGB(120, 80, 160) or Color3.fromRGB(80, 50, 120)}):Play()
-            AnimationSystem:Pulse(card, 1.02, 0.2)
-        end 
+    -- 优化的悬停动画
+    local hoverTween
+    card.MouseEnter:Connect(function()
+        if not lockOverlay.Visible then
+            hoverTween = TweenService:Create(stroke, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Color = isLight and Color3.fromRGB(120, 80, 160) or Color3.fromRGB(80, 50, 120),
+                Thickness = 1.5
+            })
+            hoverTween:Play()
+            TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = isLight and Color3.fromRGB(40, 34, 52) or Color3.fromRGB(28, 24, 34)
+            }):Play()
+        end
     end)
-    card.MouseLeave:Connect(function() 
-        if not lockOverlay.Visible then 
-            TweenService:Create(stroke, TweenInfo.new(0.2), {Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)}):Play()
-        end 
+    card.MouseLeave:Connect(function()
+        if not lockOverlay.Visible then
+            if hoverTween then hoverTween:Cancel() end
+            TweenService:Create(stroke, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70),
+                Thickness = 1
+            }):Play()
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+            }):Play()
+        end
     end)
     
+    -- 优化的点击动画
     card.MouseButton1Click:Connect(function()
         if lockOverlay.Visible then return end
-        local hoverColor = isLight and Color3.fromRGB(45, 38, 58) or Color3.fromRGB(35, 30, 45)
         local baseColor = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
-        local tw = TweenService:Create(card, TweenInfo.new(0.1), {BackgroundColor3 = hoverColor})
-        tw:Play()
-        tw.Completed:Connect(function() 
-            TweenService:Create(card, TweenInfo.new(0.1), {BackgroundColor3 = baseColor}):Play()
-        end)
+        local pressColor = isLight and Color3.fromRGB(50, 42, 65) or Color3.fromRGB(40, 35, 50)
+        
+        -- 按下缩小效果
+        TweenService:Create(card, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = pressColor,
+            Size = UDim2.new(0, 338, 0, 53)
+        }):Play()
+        
+        task.wait(0.08)
+        
+        TweenService:Create(card, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            BackgroundColor3 = baseColor,
+            Size = UDim2.new(0, 340, 0, 55)
+        }):Play()
+        
         if options.Callback then task.spawn(options.Callback) end
     end)
 
-    -- 入场动画
-    AnimationSystem:FadeIn(card, 0.3, self.ItemCount * 0.05)
-    AnimationSystem:SlideIn(card, "left", 0.3, self.ItemCount * 0.05)
-
     return {
-        SetTitle = function(t) lblTitle.Text = t end,
+        SetTitle = function(t) 
+            lblTitle.Text = t 
+            TweenService:Create(lblTitle, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                TextTransparency = 0
+            }):Play()
+        end,
         SetDesc = function(d) lblDesc.Text = d end,
-        Lock = function() lockOverlay.Visible = true; TweenService:Create(lockOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 0.5}):Play() end,
-        Unlock = function() TweenService:Create(lockOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play() task.wait(0.2) lockOverlay.Visible = false end,
+        Lock = function() 
+            lockOverlay.Visible = true
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0.4
+            }):Play()
+        end,
+        Unlock = function() 
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            lockOverlay.Visible = false 
+        end,
         Destroy = function() 
-            AnimationSystem:FadeOut(card, 0.3, function()
-                card:Destroy()
-            end)
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            card:Destroy() 
         end
     }
 end
@@ -720,7 +868,13 @@ function TabClass:Toggle(options)
     local isCheckbox = options.Type == "Checkbox"
 
     local card = Instance.new("TextButton", self.Container)
-    card.Size = UDim2.new(0, 340, 0, 60); card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24); card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0; card.Text = ""; card.AutoButtonColor = false; card.LayoutOrder = self.ItemCount; card.ZIndex = 12
+    card.Size = UDim2.new(0, 340, 0, 60)
+    card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+    card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0
+    card.Text = ""
+    card.AutoButtonColor = false
+    card.LayoutOrder = self.ItemCount
+    card.ZIndex = 12
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
     Instance.new("UIStroke", card).Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
 
@@ -729,77 +883,729 @@ function TabClass:Toggle(options)
 
     if options.Icon then
         local ic = Instance.new("ImageLabel", card)
-        ic.Size = UDim2.new(0, 18, 0, 18); ic.Position = UDim2.new(0, 10, 0, 10); ic.BackgroundTransparency = 1; ic.Image = Icons[options.Icon] or ""; ic.ImageColor3 = Color3.fromRGB(200, 180, 230); ic.ZIndex = 13
+        ic.Size = UDim2.new(0, 18, 0, 18)
+        ic.Position = UDim2.new(0, 10, 0, 10)
+        ic.BackgroundTransparency = 1
+        ic.Image = Icons[options.Icon] or ""
+        ic.ImageColor3 = Color3.fromRGB(200, 180, 230)
+        ic.ZIndex = 13
     end
 
     local lblTitle = Instance.new("TextLabel", card)
-    lblTitle.Size = UDim2.new(1, -(textOffset + 50), 0, 16); lblTitle.Position = UDim2.new(0, textOffset, 0, 10); lblTitle.BackgroundTransparency = 1; lblTitle.Text = options.Title or "Toggle"; lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245); lblTitle.FontFace = FontUI; lblTitle.TextSize = 14; lblTitle.TextXAlignment = Enum.TextXAlignment.Left; lblTitle.ZIndex = 13
+    lblTitle.Size = UDim2.new(1, -(textOffset + 50), 0, 16)
+    lblTitle.Position = UDim2.new(0, textOffset, 0, 10)
+    lblTitle.BackgroundTransparency = 1
+    lblTitle.Text = options.Title or "Toggle"
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245)
+    lblTitle.FontFace = FontUI
+    lblTitle.TextSize = 14
+    lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+    lblTitle.ZIndex = 13
     RegisterText(lblTitle)
 
     local lblDesc = Instance.new("TextLabel", card)
-    lblDesc.Size = UDim2.new(1, -20, 0, 28); lblDesc.Position = UDim2.new(0, 10, 0, 28); lblDesc.BackgroundTransparency = 1; lblDesc.Text = options.Desc or ""; lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190); lblDesc.FontFace = FontUI; lblDesc.TextSize = 11; lblDesc.TextWrapped = true; lblDesc.TextXAlignment = Enum.TextXAlignment.Left; lblDesc.TextYAlignment = Enum.TextYAlignment.Top; lblDesc.ZIndex = 13
+    lblDesc.Size = UDim2.new(1, -20, 0, 28)
+    lblDesc.Position = UDim2.new(0, 10, 0, 28)
+    lblDesc.BackgroundTransparency = 1
+    lblDesc.Text = options.Desc or ""
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
+    lblDesc.FontFace = FontUI
+    lblDesc.TextSize = 11
+    lblDesc.TextWrapped = true
+    lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+    lblDesc.TextYAlignment = Enum.TextYAlignment.Top
+    lblDesc.ZIndex = 13
     RegisterText(lblDesc)
 
     local offColor = isLight and Color3.fromRGB(60, 50, 80) or Color3.fromRGB(40, 30, 55)
     local switchBg = Instance.new("Frame", card)
-    switchBg.AnchorPoint = Vector2.new(1, 0.5); switchBg.Position = UDim2.new(1, -10, 0.5, 0); switchBg.ZIndex = 14
+    switchBg.AnchorPoint = Vector2.new(1, 0.5)
+    switchBg.Position = UDim2.new(1, -10, 0.5, 0)
+    switchBg.ZIndex = 14
 
     local checkMark, circle
 
     if isCheckbox then
-        switchBg.Size = UDim2.new(0, 22, 0, 22); switchBg.BackgroundColor3 = state and Color3.fromRGB(160, 90, 255) or offColor
+        switchBg.Size = UDim2.new(0, 22, 0, 22)
+        switchBg.BackgroundColor3 = state and Color3.fromRGB(160, 90, 255) or offColor
         Instance.new("UICorner", switchBg).CornerRadius = UDim.new(0, 6)
-        checkMark = Instance.new("ImageLabel", switchBg); checkMark.Size = UDim2.new(0, 16, 0, 16); checkMark.AnchorPoint = Vector2.new(0.5, 0.5); checkMark.Position = UDim2.new(0.5, 0, 0.5, 0); checkMark.BackgroundTransparency = 1; checkMark.Image = Icons["check"] or ""; checkMark.ImageColor3 = Color3.fromRGB(255, 255, 255); checkMark.ImageTransparency = state and 0 or 1; checkMark.ZIndex = 15
+        checkMark = Instance.new("ImageLabel", switchBg)
+        checkMark.Size = UDim2.new(0, 16, 0, 16)
+        checkMark.AnchorPoint = Vector2.new(0.5, 0.5)
+        checkMark.Position = UDim2.new(0.5, 0, 0.5, 0)
+        checkMark.BackgroundTransparency = 1
+        checkMark.Image = Icons["check"] or ""
+        checkMark.ImageColor3 = Color3.fromRGB(255, 255, 255)
+        checkMark.ImageTransparency = state and 0 or 1
+        checkMark.ZIndex = 15
     else
-        switchBg.Size = UDim2.new(0, 32, 0, 18); switchBg.BackgroundColor3 = state and Color3.fromRGB(160, 90, 255) or offColor
+        switchBg.Size = UDim2.new(0, 32, 0, 18)
+        switchBg.BackgroundColor3 = state and Color3.fromRGB(160, 90, 255) or offColor
         Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
-        circle = Instance.new("Frame", switchBg); circle.Size = UDim2.new(0, 14, 0, 14); circle.AnchorPoint = Vector2.new(0, 0.5); circle.Position = state and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0); circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255); circle.ZIndex = 15
+        circle = Instance.new("Frame", switchBg)
+        circle.Size = UDim2.new(0, 14, 0, 14)
+        circle.AnchorPoint = Vector2.new(0, 0.5)
+        circle.Position = state and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
+        circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        circle.ZIndex = 15
         Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
     end
 
+    -- 优化的切换动画
     local function updateVisual()
-        TweenService:Create(switchBg, TweenInfo.new(0.2), {BackgroundColor3 = state and Color3.fromRGB(160, 90, 255) or offColor}):Play()
+        local color = state and Color3.fromRGB(160, 90, 255) or offColor
+        -- 使用弹簧效果
+        TweenService:Create(switchBg, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            BackgroundColor3 = color
+        }):Play()
+        
         if isCheckbox then
-            TweenService:Create(checkMark, TweenInfo.new(0.2), {ImageTransparency = state and 0 or 1}):Play()
+            TweenService:Create(checkMark, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                ImageTransparency = state and 0 or 1,
+                Rotation = state and 0 or 90
+            }):Play()
         else
-            TweenService:Create(circle, TweenInfo.new(0.2), {Position = state and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)}):Play()
+            TweenService:Create(circle, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out, 0, false, 1.2), {
+                Position = state and UDim2.new(1, -16, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
+            }):Play()
         end
     end
+
+    -- 优化的卡片悬停效果
+    card.MouseEnter:Connect(function()
+        if not lockOverlay.Visible then
+            TweenService:Create(card, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = isLight and Color3.fromRGB(40, 34, 52) or Color3.fromRGB(28, 24, 34)
+            }):Play()
+        end
+    end)
+    card.MouseLeave:Connect(function()
+        if not lockOverlay.Visible then
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+            }):Play()
+        end
+    end)
 
     card.MouseButton1Click:Connect(function()
         if lockOverlay.Visible then return end
         state = not state
         updateVisual()
+        -- 点击反馈动画
+        TweenService:Create(card, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 336, 0, 58)
+        }):Play()
+        task.wait(0.05)
+        TweenService:Create(card, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 340, 0, 60)
+        }):Play()
         if options.Callback then task.spawn(options.Callback, state) end
     end)
-
-    -- 入场动画
-    AnimationSystem:FadeIn(card, 0.3, self.ItemCount * 0.05)
-    AnimationSystem:SlideIn(card, "left", 0.3, self.ItemCount * 0.05)
 
     return {
         SetTitle = function(t) lblTitle.Text = t end,
         SetDesc = function(d) lblDesc.Text = d end,
         SetValue = function(v) state = v; updateVisual() end,
-        Lock = function() lockOverlay.Visible = true; TweenService:Create(lockOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 0.5}):Play() end,
-        Unlock = function() TweenService:Create(lockOverlay, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play() task.wait(0.2) lockOverlay.Visible = false end,
+        Lock = function() 
+            lockOverlay.Visible = true
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0.4
+            }):Play()
+        end,
+        Unlock = function() 
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            lockOverlay.Visible = false 
+        end,
         Destroy = function() 
-            AnimationSystem:FadeOut(card, 0.3, function()
-                card:Destroy()
-            end)
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            card:Destroy() 
         end,
         Get = function() return state end
     }
 end
 
--- 其他方法类似添加动画效果...
+function TabClass:Input(options)
+    self.ItemCount = self.ItemCount + 1
+    local isLight = WindowConfig.Theme == "Light"
+    local isTextarea = options.Type == "Textarea"
+    
+    local card = Instance.new("Frame", self.Container)
+    card.Size = UDim2.new(0, 340, 0, isTextarea and 90 or 65)
+    card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+    card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0
+    card.LayoutOrder = self.ItemCount
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", card).Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
+    
+    local lockOverlay = CreateLockOverlay(card)
+    local iconOffset = options.InputIcon and 35 or 10
+    
+    if options.InputIcon then
+        local ic = Instance.new("ImageLabel", card)
+        ic.Size = UDim2.new(0, 18, 0, 18)
+        ic.Position = UDim2.new(0, 10, 0, 10)
+        ic.BackgroundTransparency = 1
+        ic.Image = Icons[options.InputIcon] or ""
+        ic.ImageColor3 = Color3.fromRGB(200, 180, 230)
+    end
+    
+    local lblTitle = Instance.new("TextLabel", card)
+    lblTitle.Size = UDim2.new(1, -120, 0, 16)
+    lblTitle.Position = UDim2.new(0, iconOffset, 0, 10)
+    lblTitle.BackgroundTransparency = 1
+    lblTitle.Text = options.Title or "Input"
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245)
+    lblTitle.FontFace = FontUI
+    lblTitle.TextSize = 14
+    lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+    RegisterText(lblTitle)
+    
+    local lblDesc = Instance.new("TextLabel", card)
+    lblDesc.Size = UDim2.new(1, -120, 0, 16)
+    lblDesc.Position = UDim2.new(0, iconOffset, 0, 28)
+    lblDesc.BackgroundTransparency = 1
+    lblDesc.Text = options.Desc or ""
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
+    lblDesc.FontFace = FontUI
+    lblDesc.TextSize = 11
+    lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+    RegisterText(lblDesc)
+    
+    local boxBg = Instance.new("Frame", card)
+    boxBg.Size = isTextarea and UDim2.new(1, -20, 0, 40) or UDim2.new(0, 110, 0, 30)
+    boxBg.AnchorPoint = isTextarea and Vector2.new(0, 0) or Vector2.new(1, 0.5)
+    boxBg.Position = isTextarea and UDim2.new(0, 10, 0, 45) or UDim2.new(1, -10, 0.5, 0)
+    boxBg.BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(14, 12, 18)
+    Instance.new("UICorner", boxBg).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", boxBg).Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
+    
+    local box = Instance.new("TextBox", boxBg)
+    box.Size = UDim2.new(1, -10, 1, 0)
+    box.Position = UDim2.new(0, 5, 0, 0)
+    box.BackgroundTransparency = 1
+    box.Text = options.Value or ""
+    box.PlaceholderText = options.Placeholder or ""
+    box.TextColor3 = Color3.fromRGB(220, 200, 245)
+    box.PlaceholderColor3 = Color3.fromRGB(130, 110, 160)
+    box.FontFace = FontUI
+    box.TextSize = 12
+    box.TextWrapped = isTextarea
+    box.ClearTextOnFocus = not isTextarea
+    box.TextXAlignment = isTextarea and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center
+    box.TextYAlignment = isTextarea and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center
+    RegisterText(box)
+    
+    -- 优化输入框聚焦动画
+    box.Focused:Connect(function()
+        TweenService:Create(boxBg, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = isLight and Color3.fromRGB(40, 34, 52) or Color3.fromRGB(24, 20, 30)
+        }):Play()
+        TweenService:Create(boxBg:FindFirstChildOfClass("UIStroke"), TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Color = Color3.fromRGB(160, 90, 255),
+            Thickness = 1.5
+        }):Play()
+    end)
+    box.FocusLost:Connect(function()
+        TweenService:Create(boxBg, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(14, 12, 18)
+        }):Play()
+        TweenService:Create(boxBg:FindFirstChildOfClass("UIStroke"), TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70),
+            Thickness = 1
+        }):Play()
+        if options.Callback then task.spawn(options.Callback, box.Text) end
+    end)
+    
+    return {
+        SetTitle = function(t) lblTitle.Text = t end,
+        SetDesc = function(d) lblDesc.Text = d end,
+        SetPlaceholder = function(p) box.PlaceholderText = p end,
+        SetValue = function(v) box.Text = v end,
+        Lock = function() 
+            lockOverlay.Visible = true
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0.4
+            }):Play()
+        end,
+        Unlock = function() 
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            lockOverlay.Visible = false 
+        end,
+        Destroy = function() 
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            card:Destroy() 
+        end,
+        Get = function() return box.Text end
+    }
+end
+
+function TabClass:Dropdown(options)
+    self.ItemCount = self.ItemCount + 1
+    local isLight = WindowConfig.Theme == "Light"
+    local optionList = options.Options or {}
+    local currentValue = options.Value or (optionList[1] or "...")
+    local isOpen = false
+
+    local card = Instance.new("Frame", self.Container)
+    card.Size = UDim2.new(0, 340, 0, 60)
+    card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+    card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0
+    card.ClipsDescendants = true
+    card.LayoutOrder = self.ItemCount
+    card.ZIndex = 12
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", card).Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
+
+    local lockOverlay = CreateLockOverlay(card)
+    local textOffset = options.Icon and 35 or 10
+
+    if options.Icon then
+        local ic = Instance.new("ImageLabel", card)
+        ic.Size = UDim2.new(0, 18, 0, 18)
+        ic.Position = UDim2.new(0, 10, 0, 10)
+        ic.BackgroundTransparency = 1
+        ic.Image = Icons[options.Icon] or ""
+        ic.ImageColor3 = Color3.fromRGB(200, 180, 230)
+        ic.ZIndex = 13
+    end
+
+    local lblTitle = Instance.new("TextLabel", card)
+    lblTitle.Size = UDim2.new(1, -(textOffset + 120), 0, 16)
+    lblTitle.Position = UDim2.new(0, textOffset, 0, 10)
+    lblTitle.BackgroundTransparency = 1
+    lblTitle.Text = options.Title or "Dropdown"
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245)
+    lblTitle.FontFace = FontUI
+    lblTitle.TextSize = 14
+    lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+    lblTitle.ZIndex = 13
+    RegisterText(lblTitle)
+
+    local lblDesc = Instance.new("TextLabel", card)
+    lblDesc.Size = UDim2.new(1, -20, 0, 28)
+    lblDesc.Position = UDim2.new(0, 10, 0, 28)
+    lblDesc.BackgroundTransparency = 1
+    lblDesc.Text = options.Desc or ""
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
+    lblDesc.FontFace = FontUI
+    lblDesc.TextSize = 11
+    lblDesc.TextWrapped = true
+    lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+    lblDesc.TextYAlignment = Enum.TextYAlignment.Top
+    lblDesc.ZIndex = 13
+    RegisterText(lblDesc)
+
+    local selectBtn = Instance.new("TextButton", card)
+    selectBtn.Size = UDim2.new(0, 110, 0, 24)
+    selectBtn.AnchorPoint = Vector2.new(1, 0)
+    selectBtn.Position = UDim2.new(1, -10, 0, 6)
+    selectBtn.BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(35, 30, 45)
+    selectBtn.Text = "  " .. currentValue
+    selectBtn.TextColor3 = Color3.fromRGB(220, 200, 245)
+    selectBtn.FontFace = FontUI
+    selectBtn.TextSize = 12
+    selectBtn.TextXAlignment = Enum.TextXAlignment.Left
+    selectBtn.ZIndex = 14
+    Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 6)
+    RegisterText(selectBtn)
+
+    local arrow = Instance.new("ImageLabel", selectBtn)
+    arrow.Size = UDim2.new(0, 14, 0, 14)
+    arrow.AnchorPoint = Vector2.new(1, 0.5)
+    arrow.Position = UDim2.new(1, -5, 0.5, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Image = Icons["chevron-down"]
+    arrow.ImageColor3 = Color3.fromRGB(200, 180, 230)
+    arrow.ZIndex = 15
+
+    local listFrame = Instance.new("ScrollingFrame", card)
+    listFrame.Size = UDim2.new(1, -20, 0, 0)
+    listFrame.Position = UDim2.new(0, 10, 0, 60)
+    listFrame.BackgroundTransparency = 1
+    listFrame.ScrollBarThickness = 2
+    listFrame.ZIndex = 14
+    local listLayout = Instance.new("UIListLayout", listFrame)
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 4)
+
+    for i, optName in ipairs(optionList) do
+        local optBtn = Instance.new("TextButton", listFrame)
+        optBtn.Size = UDim2.new(1, -8, 0, 25)
+        optBtn.BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(28, 24, 35)
+        optBtn.Text = "  " .. optName
+        optBtn.TextColor3 = Color3.fromRGB(220, 200, 245)
+        optBtn.FontFace = FontUI
+        optBtn.TextSize = 13
+        optBtn.TextXAlignment = Enum.TextXAlignment.Left
+        optBtn.ZIndex = 15
+        Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 4)
+        RegisterText(optBtn)
+        
+        -- 优化的选项悬停动画
+        optBtn.MouseEnter:Connect(function()
+            TweenService:Create(optBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = isLight and Color3.fromRGB(45, 38, 58) or Color3.fromRGB(50, 40, 65)
+            }):Play()
+        end)
+        optBtn.MouseLeave:Connect(function()
+            TweenService:Create(optBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(28, 24, 35)
+            }):Play()
+        end)
+        
+        optBtn.MouseButton1Click:Connect(function()
+            if lockOverlay.Visible then return end
+            currentValue = optName
+            selectBtn.Text = "  " .. currentValue
+            isOpen = false
+            TweenService:Create(arrow, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Rotation = 0
+            }):Play()
+            TweenService:Create(card, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 340, 0, 60)
+            }):Play()
+            if options.Callback then task.spawn(options.Callback, currentValue) end
+        end)
+    end
+
+    -- 优化的下拉展开动画
+    selectBtn.MouseButton1Click:Connect(function()
+        if lockOverlay.Visible then return end
+        isOpen = not isOpen
+        local targetHeight = isOpen and math.min(60 + (#optionList * 29), 160) or 60
+        listFrame.Size = UDim2.new(1, -20, 0, targetHeight - 65)
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, #optionList * 29)
+        TweenService:Create(arrow, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Rotation = isOpen and 180 or 0
+        }):Play()
+        TweenService:Create(card, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Size = UDim2.new(0, 340, 0, targetHeight)
+        }):Play()
+    end)
+
+    return {
+        SetTitle = function(t) lblTitle.Text = t end,
+        Destroy = function() 
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            card:Destroy() 
+        end,
+        Set = function(v) 
+            currentValue = v
+            selectBtn.Text = "  " .. v
+        end,
+        Get = function() return currentValue end
+    }
+end
+
+function TabClass:Paragraph(options)
+    self.ItemCount = self.ItemCount + 1
+    local isLight = WindowConfig.Theme == "Light"
+    local btns = options.Buttons or {}
+    local hasButtons = #btns > 0
+    
+    local card = Instance.new("Frame", self.Container)
+    card.Size = UDim2.new(0, 340, 0, hasButtons and 95 or 65)
+    card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+    card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0
+    card.LayoutOrder = self.ItemCount
+    if options.Locked then card.BackgroundTransparency = 0.6 end
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    
+    local stroke = Instance.new("UIStroke", card)
+    if typeof(options.Color) == "string" then
+        stroke.Color = options.Color == "Red" and Color3.fromRGB(200, 50, 80) or (isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70))
+    elseif typeof(options.Color) == "Color3" then
+        stroke.Color = options.Color
+    else
+        stroke.Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
+    end
+
+    local lblTitle = Instance.new("TextLabel", card)
+    lblTitle.Size = UDim2.new(1, -20, 0, 16)
+    lblTitle.Position = UDim2.new(0, 10, 0, 10)
+    lblTitle.BackgroundTransparency = 1
+    lblTitle.Text = options.Title or "Paragraph"
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245)
+    lblTitle.FontFace = FontUI
+    lblTitle.TextSize = 14
+    lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+    if options.Locked then lblTitle.TextTransparency = 0.5 end
+    RegisterText(lblTitle)
+    
+    local lblDesc = Instance.new("TextLabel", card)
+    lblDesc.Size = UDim2.new(1, -20, 0, 28)
+    lblDesc.Position = UDim2.new(0, 10, 0, 28)
+    lblDesc.BackgroundTransparency = 1
+    lblDesc.Text = options.Desc or ""
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
+    lblDesc.FontFace = FontUI
+    lblDesc.TextSize = 11
+    lblDesc.TextWrapped = true
+    lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+    lblDesc.TextYAlignment = Enum.TextYAlignment.Top
+    if options.Locked then lblDesc.TextTransparency = 0.5 end
+    RegisterText(lblDesc)
+    
+    if hasButtons then
+        local btnContainer = Instance.new("Frame", card)
+        btnContainer.Size = UDim2.new(1, -20, 0, 28)
+        btnContainer.Position = UDim2.new(0, 10, 0, 60)
+        btnContainer.BackgroundTransparency = 1
+        local layout = Instance.new("UIListLayout", btnContainer)
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Padding = UDim.new(0, 6)
+        
+        for i, btnData in ipairs(btns) do
+            local pBtn = Instance.new("TextButton", btnContainer)
+            pBtn.Size = UDim2.new(1 / #btns, -6 + (6/#btns), 1, 0)
+            pBtn.BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(35, 30, 45)
+            pBtn.Text = btnData.Title or "Button"
+            pBtn.TextColor3 = Color3.fromRGB(220, 200, 245)
+            pBtn.FontFace = FontUI
+            pBtn.TextSize = 12
+            Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 6)
+            RegisterText(pBtn)
+            
+            if options.Locked then
+                pBtn.BackgroundTransparency = 0.5
+                pBtn.TextTransparency = 0.5
+                pBtn.AutoButtonColor = false
+            else
+                -- 优化的按钮悬停动画
+                pBtn.MouseEnter:Connect(function()
+                    TweenService:Create(pBtn, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        BackgroundColor3 = isLight and Color3.fromRGB(45, 38, 58) or Color3.fromRGB(50, 40, 65),
+                        Size = UDim2.new(1 / #btns, -6 + (6/#btns) + 2, 1, 2)
+                    }):Play()
+                end)
+                pBtn.MouseLeave:Connect(function()
+                    TweenService:Create(pBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                        BackgroundColor3 = isLight and Color3.fromRGB(30, 25, 40) or Color3.fromRGB(35, 30, 45),
+                        Size = UDim2.new(1 / #btns, -6 + (6/#btns), 1, 0)
+                    }):Play()
+                end)
+                
+                pBtn.MouseButton1Click:Connect(function()
+                    if btnData.Callback then task.spawn(btnData.Callback) end
+                end)
+            end
+        end
+    end
+
+    return {
+        SetTitle = function(t) lblTitle.Text = t end,
+        SetDesc = function(d) lblDesc.Text = d end,
+        Destroy = function() 
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            card:Destroy() 
+        end
+    }
+end
+
+function TabClass:Slider(options)
+    self.ItemCount = self.ItemCount + 1
+    local isLight = WindowConfig.Theme == "Light"
+    
+    local step = options.Step or 1
+    local minVal = options.Value.Min or 0
+    local maxVal = options.Value.Max or 100
+    local defaultVal = options.Value.Default or minVal
+    local currentVal = defaultVal
+
+    local card = Instance.new("Frame", self.Container)
+    card.Size = UDim2.new(0, 340, 0, 65)
+    card.BackgroundColor3 = isLight and Color3.fromRGB(35, 30, 45) or Color3.fromRGB(20, 18, 24)
+    card.BackgroundTransparency = WindowConfig.Transparent and 0.2 or 0
+    card.LayoutOrder = self.ItemCount
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    Instance.new("UIStroke", card).Color = isLight and Color3.fromRGB(80, 50, 120) or Color3.fromRGB(50, 35, 70)
+
+    local lockOverlay = CreateLockOverlay(card)
+
+    local lblTitle = Instance.new("TextLabel", card)
+    lblTitle.Size = UDim2.new(1, -100, 0, 16)
+    lblTitle.Position = UDim2.new(0, 12, 0, 10)
+    lblTitle.BackgroundTransparency = 1
+    lblTitle.Text = options.Title or "Slider"
+    lblTitle.TextColor3 = Color3.fromRGB(220, 200, 245)
+    lblTitle.FontFace = FontUI
+    lblTitle.TextSize = 14
+    lblTitle.TextXAlignment = Enum.TextXAlignment.Left
+    RegisterText(lblTitle)
+
+    local lblDesc = Instance.new("TextLabel", card)
+    lblDesc.Size = UDim2.new(1, -100, 0, 16)
+    lblDesc.Position = UDim2.new(0, 12, 0, 26)
+    lblDesc.BackgroundTransparency = 1
+    lblDesc.Text = options.Desc or ""
+    lblDesc.TextColor3 = Color3.fromRGB(170, 150, 190)
+    lblDesc.FontFace = FontUI
+    lblDesc.TextSize = 11
+    lblDesc.TextXAlignment = Enum.TextXAlignment.Left
+    RegisterText(lblDesc)
+
+    local valBox = Instance.new("TextBox", card)
+    valBox.Size = UDim2.new(0, 45, 0, 22)
+    valBox.Position = UDim2.new(1, -57, 0, 12)
+    valBox.BackgroundColor3 = Color3.fromRGB(14, 12, 18)
+    valBox.TextColor3 = Color3.fromRGB(220, 200, 245)
+    valBox.Text = tostring(defaultVal)
+    valBox.FontFace = FontUI
+    valBox.TextSize = 12
+    valBox.BorderSizePixel = 0
+    valBox.ClearTextOnFocus = false
+    Instance.new("UICorner", valBox).CornerRadius = UDim.new(0, 4)
+    RegisterText(valBox)
+
+    local slideTrack = Instance.new("TextButton", card)
+    slideTrack.Size = UDim2.new(1, -24, 0, 6)
+    slideTrack.Position = UDim2.new(0, 12, 0, 48)
+    slideTrack.BackgroundColor3 = Color3.fromRGB(40, 30, 55)
+    slideTrack.Text = ""
+    slideTrack.AutoButtonColor = false
+    slideTrack.BorderSizePixel = 0
+    Instance.new("UICorner", slideTrack).CornerRadius = UDim.new(1, 0)
+
+    local slideFill = Instance.new("Frame", slideTrack)
+    slideFill.Size = UDim2.new(0, 0, 1, 0)
+    slideFill.BackgroundColor3 = Color3.fromRGB(160, 90, 255)
+    slideFill.BorderSizePixel = 0
+    Instance.new("UICorner", slideFill).CornerRadius = UDim.new(1, 0)
+
+    local slideCircle = Instance.new("Frame", slideFill)
+    slideCircle.Size = UDim2.new(0, 12, 0, 12)
+    slideCircle.AnchorPoint = Vector2.new(0.5, 0.5)
+    slideCircle.Position = UDim2.new(1, 0, 0.5, 0)
+    slideCircle.BackgroundColor3 = Color3.fromRGB(200, 180, 230)
+    slideCircle.BorderSizePixel = 0
+    Instance.new("UICorner", slideCircle).CornerRadius = UDim.new(1, 0)
+
+    local sliding = false
+
+    local function updateValue(rawVal, animate)
+        local clamped = math.clamp(rawVal, minVal, maxVal)
+        local rounded = math.round((clamped - minVal) / step) * step + minVal
+        currentVal = math.clamp(rounded, minVal, maxVal)
+        
+        valBox.Text = tostring(currentVal)
+        
+        local percent = (currentVal - minVal) / (maxVal - minVal)
+        if animate then
+            -- 使用弹簧效果
+            TweenService:Create(slideFill, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(percent, 0, 1, 0)
+            }):Play()
+        else
+            slideFill.Size = UDim2.new(percent, 0, 1, 0)
+        end
+        
+        if options.Callback then task.spawn(options.Callback, currentVal) end
+    end
+
+    local function updateFromMouse()
+        if lockOverlay.Visible then return end
+        local mousePos = UserInputService:GetMouseLocation().X
+        local trackPos = slideTrack.AbsolutePosition.X
+        local trackWidth = slideTrack.AbsoluteSize.X
+        local percent = math.clamp((mousePos - trackPos) / trackWidth, 0, 1)
+        local calculated = minVal + (percent * (maxVal - minVal))
+        updateValue(calculated, false)
+    end
+
+    slideTrack.InputBegan:Connect(function(input)
+        if lockOverlay.Visible then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            sliding = true
+            updateFromMouse()
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateFromMouse()
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            sliding = false
+        end
+    end)
+
+    valBox.FocusLost:Connect(function()
+        local inputNum = tonumber(valBox.Text)
+        if inputNum then 
+            updateValue(inputNum, true) 
+        else 
+            valBox.Text = tostring(currentVal) 
+        end
+    end)
+
+    updateValue(defaultVal, false)
+
+    return {
+        SetTitle = function(t) lblTitle.Text = t end,
+        SetDesc = function(d) lblDesc.Text = d end,
+        SetMin = function(min) minVal = min; updateValue(currentVal, true) end,
+        SetMax = function(max) maxVal = max; updateValue(currentVal, true) end,
+        SetValue = function(v) updateValue(v, true) end,
+        Lock = function() 
+            lockOverlay.Visible = true
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 0.4
+            }):Play()
+        end,
+        Unlock = function() 
+            TweenService:Create(lockOverlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            lockOverlay.Visible = false 
+        end,
+        Destroy = function() 
+            TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Size = UDim2.new(0, 340, 0, 0),
+                BackgroundTransparency = 1
+            }):Play()
+            task.wait(0.3)
+            card:Destroy() 
+        end,
+        Get = function() return currentVal end
+    }
+end
 
 function LuannyUi:Destroy()
     if ScreenGui then
-        AnimationSystem:FadeOut(ScreenGui, 0.5, function()
-            ScreenGui:Destroy()
-            ScreenGui = nil
-        end)
+        -- 优雅的销毁动画
+        TweenService:Create(ScreenGui, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            [Enum.InstanceAttribute.Enabled] = false
+        }):Play()
+        task.wait(0.5)
+        ScreenGui:Destroy()
+        ScreenGui = nil
     end
     
     if NotifyScreen then
@@ -818,14 +1624,13 @@ end
 
 function LuannyUi:Hide()
     if ScreenGui then
-        AnimationSystem:FadeOut(ScreenGui, 0.3)
+        ScreenGui.Enabled = false
     end
 end
 
 function LuannyUi:Show()
     if ScreenGui then
         ScreenGui.Enabled = true
-        AnimationSystem:FadeIn(ScreenGui, 0.3)
     end
 end
 
